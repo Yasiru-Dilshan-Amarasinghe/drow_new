@@ -2,12 +2,17 @@
 
 A real-time driver drowsiness detection system using Python and OpenCV. This project detects driver fatigue by monitoring eye closure patterns and alerts the driver when drowsiness is detected.
 
+**Now with Raspberry Pi 4 support and PWM signal output!** 🚀
+
 ## Features
 
 - **Real-time Face Detection**: Detects driver's face using Haar Cascade classifiers
 - **Eye Detection**: Identifies eyes in detected face regions
 - **Drowsiness Monitoring**: Tracks eye closure duration to detect drowsiness
-- **Audio Alerts**: Triggers alarm when drowsiness is detected
+- **Audio & Hardware Alerts**: 
+  - System audio alerts (beep)
+  - PWM signal output for hardware buzzers (Raspberry Pi)
+  - LED indicator control (Raspberry Pi)
 - **Performance Metrics**: Displays real-time statistics including:
   - Eye Aspect Ratio (EAR)
   - Drowsiness events count
@@ -18,14 +23,19 @@ A real-time driver drowsiness detection system using Python and OpenCV. This pro
 
 ```
 driver-drowsiness-detection/
-├── main.py                    # Main application entry point
-├── requirements.txt           # Python dependencies
-├── README.md                  # Project documentation
+├── main.py                    # Main application (Desktop)
+├── main_rpi.py                # Raspberry Pi version with PWM control
+├── requirements.txt           # Desktop dependencies
+├── requirements-rpi.txt       # Raspberry Pi dependencies
+├── RPI_SETUP.md              # Raspberry Pi hardware setup guide
+├── README.md                  # This file
 ├── config/
-│   └── config.py             # Configuration settings
+│   ├── config.py             # Desktop configuration
+│   └── rpi_config.py         # Raspberry Pi configuration
 ├── src/
 │   ├── eye_detector.py       # Eye and face detection module
 │   ├── drowsiness_detector.py # Core drowsiness detection logic
+│   ├── gpio_control.py       # Raspberry Pi GPIO & PWM control
 │   └── utils.py              # Utility functions for visualization and logging
 └── models/                    # Directory for trained models (if using dlib)
 ```
@@ -57,43 +67,87 @@ driver-drowsiness-detection/
 
 ## Usage
 
-### Basic Usage
+### Desktop Mode
 
-Run the main application:
+Run the application on your computer:
 ```bash
 python main.py
 ```
 
-The system will:
-1. Start capturing video from your webcam
-2. Detect face and eyes in real-time
-3. Calculate eye aspect ratio
-4. Alert when drowsiness is detected
-5. Display statistics on screen
+### Raspberry Pi Mode (with PWM & GPIO)
 
-### Controls
+Run the application with hardware GPIO and PWM control:
+```bash
+python main_rpi.py
+```
 
-- **Press 'q'** to exit the application
-- **Close window** to stop the system
+**Note**: For detailed Raspberry Pi setup with hardware wiring and configuration, see [RPI_SETUP.md](RPI_SETUP.md)
 
-### Output
+## Quick Start
 
-The system generates:
-- **Real-time video display** with face/eye detection overlays
-- **Console alerts** when drowsiness is detected
-- **Audio alerts** (beep) when drowsiness threshold is exceeded
-- **Log file** (`drowsiness_detection.log`) with all events and statistics
+### Desktop
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python main.py
+```
+
+### Raspberry Pi
+
+```bash
+# Install dependencies for Raspberry Pi
+pip install -r requirements-rpi.txt
+
+# Run with PWM support
+python main_rpi.py
+```
 
 ## Configuration
 
-Edit `config/config.py` to customize:
+Edit `config/config.py` (Desktop) or `config/rpi_config.py` (Raspberry Pi) to customize:
 
 - `EYE_AR_THRESH`: Eye aspect ratio threshold for closed eyes (default: 0.3)
 - `EYE_AR_CONSEC_FRAMES`: Consecutive frames for drowsiness detection (default: 30)
 - `ALARM_SOUND`: Enable/disable alarm (default: True)
 - `CAMERA_INDEX`: Webcam index (default: 0)
 - `FRAME_WIDTH/HEIGHT`: Video frame dimensions
-- `ENABLE_LOGGING`: Enable/disable logging
+
+### Raspberry Pi PWM Configuration
+
+Additional settings in `config/rpi_config.py`:
+
+```python
+PWM_PIN = 17              # GPIO pin for buzzer PWM output
+LED_PIN = 27              # GPIO pin for LED indicator
+PWM_FREQUENCY = 1000      # 1kHz for typical buzzer
+PWM_DUTY_CYCLE = 75       # 0-100% duty cycle
+USE_BUZZER = True         # Enable PWM buzzer
+USE_LED = True            # Enable LED indicator
+```
+
+## PWM Signal Features (Raspberry Pi)
+
+When running on Raspberry Pi, the system outputs:
+
+- **PWM Signal** on GPIO pin 17:
+  - Frequency: 1000 Hz (1 kHz)
+  - Duty Cycle: 75% (adjustable)
+  - Triggers on drowsiness detection
+  - Auto-stops when eyes open
+
+- **LED Indicator** on GPIO pin 27:
+  - ON: When drowsiness is detected
+  - OFF: When alert state clears
+
+### Example Hardware Connections
+
+**Buzzer Alert**: GPIO 17 → PWM buzzer → GND
+**LED Status**: GPIO 27 → 220Ω resistor → LED → GND
+
+See [RPI_SETUP.md](RPI_SETUP.md) for complete wiring diagrams and hardware setup instructions.
 
 ## How It Works
 
@@ -104,6 +158,41 @@ Edit `config/config.py` to customize:
    - If EAR < threshold for consecutive frames → drowsiness detected
    - Triggers alarm and logs event
 5. **Metrics Tracking**: Maintains statistics of drowsiness events
+6. **Raspberry Pi Integration** (main_rpi.py):
+   - PWM signal output on GPIO pin 17 (buzzer control)
+   - LED control on GPIO pin 27 (visual indicator)
+   - Automatic GPIO cleanup on shutdown
+
+## GPIO and PWM Control (Raspberry Pi)
+
+### PWMController Class
+
+Manages PWM output for hardware buzzers and alerts:
+
+```python
+from src.gpio_control import PWMController
+
+pwm = PWMController(gpio_pin=17, frequency=1000)
+pwm.start_alert(duty_cycle=75)      # Start alert with 75% duty
+pwm.set_duty_cycle(100)              # Change duty cycle
+pwm.pulse_alert(duration=0.5, pulses=3)  # Send 3 pulses
+pwm.stop_alert()                    # Stop alert
+pwm.cleanup()                       # Clean up GPIO
+```
+
+### LEDController Class
+
+Manages LED output for visual indicators:
+
+```python
+from src.gpio_control import LEDController
+
+led = LEDController(gpio_pin=27)
+led.on()                           # Turn LED on
+led.off()                          # Turn LED off
+led.blink(count=3, interval=0.5)  # Blink 3 times
+led.cleanup()                      # Clean up GPIO
+```
 
 ## Dependencies
 
@@ -149,10 +238,22 @@ Edit `config/config.py` to customize:
 - Position face directly toward camera
 - Remove obstructions
 
-### No alarm sound
+### No alarm sound (Desktop)
 - Check system volume settings
 - Verify `ALARM_SOUND` is enabled in config
 - Check audio device is working
+
+### PWM not working (Raspberry Pi)
+- Check GPIO pin connections and wiring
+- Verify `GPIO_ENABLED = True` in main_rpi.py
+- Ensure GPIO permissions are set correctly
+- Test GPIO pin manually: `python test_gpio.py`
+
+### Slow detection on Raspberry Pi
+- Reduce frame resolution in config
+- Increase `SKIP_FRAMES` value
+- Close unnecessary applications
+- Consider lower resolution camera input
 
 ## License
 

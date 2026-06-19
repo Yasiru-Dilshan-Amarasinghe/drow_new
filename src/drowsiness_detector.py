@@ -9,7 +9,7 @@ class DrowsinessDetector:
     Tracks eye closure duration and alerts when drowsiness is detected.
     """
     
-    def __init__(self, eye_ar_thresh=0.3, eye_ar_consec_frames=30, alarm_enabled=True):
+    def __init__(self, eye_ar_thresh=0.3, eye_ar_consec_frames=30, alarm_enabled=True, pwm_controller=None):
         """
         Initialize the drowsiness detector.
         
@@ -17,10 +17,12 @@ class DrowsinessDetector:
             eye_ar_thresh: Eye aspect ratio threshold for closed eyes
             eye_ar_consec_frames: Consecutive frames threshold for drowsiness
             alarm_enabled: Enable/disable alarm
+            pwm_controller: Optional PWMController instance for GPIO control
         """
         self.EYE_AR_THRESH = eye_ar_thresh
         self.EYE_AR_CONSEC_FRAMES = eye_ar_consec_frames
         self.alarm_enabled = alarm_enabled
+        self.pwm_controller = pwm_controller
         
         self.COUNTER = 0  # Consecutive frames with eyes closed
         self.ALARM_ON = False
@@ -57,8 +59,15 @@ class DrowsinessDetector:
             self.ALARM_ON = True
             self.drowsiness_count += 1
             self.last_alert_time = datetime.now()
+            
+            # Trigger PWM signal if controller is available
+            if self.pwm_controller and not self.pwm_controller.is_running:
+                self.pwm_controller.start_alert(duty_cycle=75)
         else:
             self.ALARM_ON = False
+            # Stop PWM signal if drowsiness no longer detected
+            if self.pwm_controller and self.pwm_controller.is_running:
+                self.pwm_controller.stop_alert()
         
         return is_drowsy, self.COUNTER, self.ALARM_ON
     
@@ -94,6 +103,15 @@ class DrowsinessDetector:
         self.drowsiness_count = 0
         self.last_alert_time = None
         self.frame_history.clear()
+        
+        # Stop PWM if running
+        if self.pwm_controller and self.pwm_controller.is_running:
+            self.pwm_controller.stop_alert()
+    
+    def cleanup(self):
+        """Clean up resources."""
+        if self.pwm_controller:
+            self.pwm_controller.cleanup()
 
 def trigger_alarm():
     """
