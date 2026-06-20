@@ -6,9 +6,10 @@ Real-time drowsiness detection using OpenCV and eye aspect ratio
 import cv2
 import sys
 import logging
+import time
 from src.eye_detector import EyeDetector, calculate_eye_aspect_ratio, get_eye_center
 from src.drowsiness_detector import DrowsinessDetector, trigger_alarm
-from src.utils import setup_logging, draw_detections, display_stats, log_event
+from src.utils import setup_logging, draw_detections, display_stats, log_event, display_datetime, display_error_status, display_system_info
 
 # Configuration
 EYE_AR_THRESH = 0.3
@@ -45,13 +46,30 @@ def main():
     
     logger.info("Camera initialized successfully")
     
+    # FPS calculation
+    prev_time = time.time()
+    fps = 0
+    frame_count = 0
+    errors = []
+    
     try:
         while True:
             ret, frame = cap.read()
+            frame_count += 1
+            
+            # Calculate FPS
+            current_time = time.time()
+            if current_time - prev_time >= 1:
+                fps = frame_count / (current_time - prev_time)
+                frame_count = 0
+                prev_time = current_time
             
             if not ret:
                 logger.warning("Failed to read frame from camera")
+                errors = ["Camera frame read failed"]
                 break
+            
+            errors = []  # Clear errors on successful frame read
             
             # Detect faces
             faces = eye_detector.detect_faces(frame)
@@ -62,7 +80,6 @@ def main():
                 eyes = eye_detector.detect_eyes(frame, face)
                 
                 # Calculate eye aspect ratio (simplified for cascade classifiers)
-                # In real-world, use dlib landmarks for better accuracy
                 eye_aspect_ratio = len(eyes) / 2 if len(eyes) > 0 else 1.0
                 
                 # If no eyes detected, assume closed
@@ -83,12 +100,24 @@ def main():
                 
                 # Draw detections
                 frame = draw_detections(frame, faces, eyes, is_drowsy, eye_aspect_ratio)
+                detection_status = "Face Detected"
             else:
                 cv2.putText(frame, "No face detected", (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 165, 255), 2)
+                detection_status = "No Face"
             
             # Display statistics
             frame = display_stats(frame, drowsiness_detector)
+            
+            # Display date and time
+            frame = display_datetime(frame, position=(10, frame.shape[0] - 20))
+            
+            # Display error status
+            frame = display_error_status(frame, errors, position=(10, 150))
+            
+            # Display system info (FPS, camera status, detection status)
+            frame = display_system_info(frame, fps=fps, camera_status="OK", 
+                                       detection_status=detection_status)
             
             # Display frame
             cv2.imshow("Driver Drowsiness Detection", frame)

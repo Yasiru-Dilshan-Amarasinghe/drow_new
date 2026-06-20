@@ -1,6 +1,7 @@
 import cv2
 import logging
 from datetime import datetime
+import sys
 
 def setup_logging(log_file="drowsiness_detection.log"):
     """
@@ -18,6 +19,78 @@ def setup_logging(log_file="drowsiness_detection.log"):
         ]
     )
     return logging.getLogger(__name__)
+
+def display_datetime(frame, position=(10, frame.shape[0] - 20)):
+    """
+    Display current date and time on the frame.
+    
+    Args:
+        frame: Input frame
+        position: (x, y) position for text
+        
+    Returns:
+        Frame with datetime overlay
+    """
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(frame, f"Time: {current_time}", position,
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    return frame
+
+def display_error_status(frame, error_list, position=(10, 150)):
+    """
+    Display error and status information on the frame.
+    
+    Args:
+        frame: Input frame
+        error_list: List of error messages or status info
+        position: (x, y) starting position for text
+        
+    Returns:
+        Frame with error status overlay
+    """
+    y_offset = position[1]
+    
+    if error_list:
+        # Display errors in red
+        for error in error_list:
+            cv2.putText(frame, f"ERROR: {error}", (position[0], y_offset),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            y_offset += 25
+    else:
+        # Display system status in green
+        cv2.putText(frame, "STATUS: OK", (position[0], y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    
+    return frame
+
+def display_system_info(frame, fps=0, camera_status="OK", detection_status="OK"):
+    """
+    Display system information on frame.
+    
+    Args:
+        frame: Input frame
+        fps: Current frames per second
+        camera_status: Camera status string
+        detection_status: Detection status string
+        
+    Returns:
+        Frame with system info overlay
+    """
+    # FPS counter (top right)
+    cv2.putText(frame, f"FPS: {fps:.1f}", (frame.shape[1] - 150, 30),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    
+    # Camera status
+    camera_color = (0, 255, 0) if camera_status == "OK" else (0, 0, 255)
+    cv2.putText(frame, f"Camera: {camera_status}", (frame.shape[1] - 150, 60),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, camera_color, 1)
+    
+    # Detection status
+    detection_color = (0, 255, 0) if detection_status == "OK" else (255, 165, 0)
+    cv2.putText(frame, f"Detection: {detection_status}", (frame.shape[1] - 150, 85),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, detection_color, 1)
+    
+    return frame
 
 def draw_detections(frame, faces, eyes, drowsy=False, ear=0):
     """
