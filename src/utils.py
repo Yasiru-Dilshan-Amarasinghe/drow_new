@@ -20,17 +20,20 @@ def setup_logging(log_file="drowsiness_detection.log"):
     )
     return logging.getLogger(__name__)
 
-def display_datetime(frame, position=(10, frame.shape[0] - 20)):
+def display_datetime(frame, position=None):
     """
     Display current date and time on the frame.
     
     Args:
         frame: Input frame
-        position: (x, y) position for text
+        position: (x, y) position for text (default: bottom left)
         
     Returns:
         Frame with datetime overlay
     """
+    if position is None:
+        position = (10, frame.shape[0] - 20)
+    
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cv2.putText(frame, f"Time: {current_time}", position,
                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
